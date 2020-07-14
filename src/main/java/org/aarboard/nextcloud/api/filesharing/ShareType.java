@@ -17,7 +17,6 @@
 package org.aarboard.nextcloud.api.filesharing;
 
 import java.security.InvalidParameterException;
-
 import javax.xml.bind.annotation.XmlEnum;
 import javax.xml.bind.annotation.XmlEnumValue;
 import javax.xml.bind.annotation.XmlType;
@@ -34,6 +33,7 @@ public enum ShareType {
     @XmlEnumValue("0") USER(0),
     @XmlEnumValue("1") GROUP(1),
     @XmlEnumValue("3") PUBLIC_LINK(3),
+    @XmlEnumValue("4") EMAIL(4),
     @XmlEnumValue("6") FEDERATED_CLOUD_SHARE(6);
 
     private final int intValue;
@@ -55,7 +55,7 @@ public enum ShareType {
                 return s;
             }
         }
-        throw new InvalidParameterException("Invalid ShareType found "+i);
+        throw new InvalidParameterException("Invalid ShareType found " + i);
     }
     
 }

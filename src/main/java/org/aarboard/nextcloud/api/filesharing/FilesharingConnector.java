@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-
 import org.aarboard.nextcloud.api.ServerConfig;
 import org.aarboard.nextcloud.api.exception.MoreThanOneShareFoundException;
 import org.aarboard.nextcloud.api.provisioning.ShareData;
@@ -38,6 +37,9 @@ import org.apache.http.message.BasicNameValuePair;
  * @author a.schild
  *
  * https://docs.nextcloud.com/server/11/developer_manual/core/ocs-share-api.html
+ * 
+ * When specifying paths, you don't have to specify any webdav roots, or 
+ * remote.php ... stuff. Just use the root of your file store directly
  *
  */
 public class FilesharingConnector
@@ -145,8 +147,8 @@ public class FilesharingConnector
      * Shares the specified path with the provided parameters
      *
      * @param path                  path to the file/folder which should be shared
-     * @param shareType             0 = user; 1 = group; 3 = public link; 6 = federated cloud share
-     * @param shareWithUserOrGroupId user / group id with which the file should be shared
+     * @param shareType             0 = user; 1 = group; 3 = public link; 4 = email; 6 = federated cloud share
+     * @param shareWithUserOrGroupIdOrEmail user / group id / email with which the file should be shared
      * @param publicUpload          allow public upload to a public shared folder (true/false)
      * @param password              password to protect public link Share with
      * @param permissions           1 = read; 2 = update; 4 = create; 8 = delete; 16 = share; 31 = all (default: 31, for public shares: 1)
@@ -155,20 +157,20 @@ public class FilesharingConnector
     public Share doShare(
             String path,
             ShareType shareType,
-            String shareWithUserOrGroupId,
+            String shareWithUserOrGroupIdOrEmail,
             Boolean publicUpload,
             String password,
             SharePermissions permissions)
     {
-        return NextcloudResponseHelper.getAndCheckStatus(doShareAsync(path, shareType, shareWithUserOrGroupId, publicUpload, password, permissions)).getShare();
+        return NextcloudResponseHelper.getAndCheckStatus(doShareAsync(path, shareType, shareWithUserOrGroupIdOrEmail, publicUpload, password, permissions)).getShare();
     }
 
     /**
     * Shares the specified path with the provided parameters asynchronously
     *
     * @param path                  path to the file/folder which should be shared
-    * @param shareType             0 = user; 1 = group; 3 = public link; 6 = federated cloud share
-    * @param shareWithUserOrGroupId user / group id with which the file should be shared
+    * @param shareType             0 = user; 1 = group; 3 = public link; 4 = email; 6 = federated cloud share
+    * @param shareWithUserOrGroupIdOrEmail user / group id / email with which the file should be shared
     * @param publicUpload          allow public upload to a public shared folder (true/false)
     * @param password              password to protect public link Share with
     * @param permissions           1 = read; 2 = update; 4 = create; 8 = delete; 16 = share; 31 = all (default: 31, for public shares: 1)
@@ -177,7 +179,7 @@ public class FilesharingConnector
     public CompletableFuture<SingleShareXMLAnswer> doShareAsync(
             String path,
             ShareType shareType,
-            String shareWithUserOrGroupId,
+            String shareWithUserOrGroupIdOrEmail,
             Boolean publicUpload,
             String password,
             SharePermissions permissions)
@@ -185,7 +187,7 @@ public class FilesharingConnector
         List<NameValuePair> postParams= new LinkedList<>();
         postParams.add(new BasicNameValuePair("path", path));
         postParams.add(new BasicNameValuePair("shareType", Integer.toString(shareType.getIntValue())));
-        postParams.add(new BasicNameValuePair("shareWith", shareWithUserOrGroupId));
+        postParams.add(new BasicNameValuePair("shareWith", shareWithUserOrGroupIdOrEmail));
         if (publicUpload != null)
         {
             postParams.add(new BasicNameValuePair("publicUpload", publicUpload ? "true" : "false"));

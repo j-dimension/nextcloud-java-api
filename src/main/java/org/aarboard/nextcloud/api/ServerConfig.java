@@ -25,15 +25,20 @@ public class ServerConfig {
     private String userName;
     private String password;
     private String serverName;
+    private String subpathPrefix;
     private boolean useHTTPS;
     private int port;
+    private boolean trustAllCertificates;
 
-    public ServerConfig(String serverName, boolean useHTTPS, int port, String userName, String password) {
+    public ServerConfig(String serverName, boolean useHTTPS, int port, 
+            String userName, String password) {
         this.userName = userName;
         this.password = password;
         this.serverName = serverName;
+        this.subpathPrefix = null;
         this.useHTTPS = useHTTPS;
         this.port = port;
+        this.trustAllCertificates = false;
     }
 
     /**
@@ -71,12 +76,27 @@ public class ServerConfig {
         return serverName;
     }
 
-    /**
-     * @param serverName the serverName to set
-     */
-    public void setServerName(String serverName) {
-        this.serverName = serverName;
-    }
+	/**
+	 * @param serverName
+	 *            the serverName to set, defaults to <code>null</code>
+	 */
+	public void setServerName(String serverName){
+		this.serverName = serverName;
+	}
+	
+	/**
+	 * @return the configured subpath prefix
+	 */
+	public String getSubpathPrefix(){
+		return subpathPrefix;
+	}
+    
+	/**
+	 * @param subpathPrefix to apply
+	 */
+	public void setSubpathPrefix(String subpathPrefix){
+		this.subpathPrefix = subpathPrefix;
+	}
 
     /**
      * @return the useHTTPS
@@ -105,7 +125,22 @@ public class ServerConfig {
     public void setPort(int port) {
         this.port = port;
     }
-
     
+	/**
+	 * @param trustAllCertificates if the client should accept any 
+         *          HTTPScertificate (e.g. to work against a self-signed
+         * 	    certificate)
+	 */
+	public void setTrustAllCertificates(boolean trustAllCertificates){
+		this.trustAllCertificates = trustAllCertificates;
+	}
+	
+	/**
+	 * @return if the client should accept any HTTPS certificate (e.g. to work against a self-signed
+	 *         certificate)
+	 */
+	public boolean isTrustAllCertificates(){
+		return trustAllCertificates;
+	}
     
 }

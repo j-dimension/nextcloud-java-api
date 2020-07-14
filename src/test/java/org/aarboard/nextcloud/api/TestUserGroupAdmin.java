@@ -28,6 +28,7 @@ import java.util.List;
 
 import org.aarboard.nextcloud.api.provisioning.User;
 import org.aarboard.nextcloud.api.provisioning.UserData;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
@@ -38,29 +39,8 @@ import org.junit.runners.MethodSorters;
  * @author a.schild
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-public class NextcloudConnectorTest {
-    private static final String TESTUSER = "testuser";
-    private static final String TESTGROUP = "testgroup";
-    private static final String TEST_FOLDER = "new-test-folder";
-    private static final String TESTFILE = "test.txt";
-
-    private String serverName = null;
-    private String userName = null;
-    private String password = null;
-
-    private NextcloudConnector _nc;
-
-    public NextcloudConnectorTest() {
-    }
-
-    @Before
-    public void setUp() {
-        if (serverName != null)
-        {
-            _nc = new NextcloudConnector(serverName, true, 0, userName, password);
-        }
-    }
-
+public class TestUserGroupAdmin extends ATestClass {
+    
     @Test
     public void t01_testCreateUser() {
         System.out.println("createUser");
@@ -280,118 +260,4 @@ public class NextcloudConnectorTest {
         }
     }
 
-    @Test
-    public void t21_testCreateFolder() {
-        System.out.println("createFolder");
-        if (_nc != null)
-        {
-            _nc.createFolder(TEST_FOLDER);
-        }
-    }
-
-    @Test
-    public void t22_testGetFolders() {
-        System.out.println("getFolders");
-        if (_nc != null)
-        {
-            String rootPath = "";
-            List<String> result = _nc.getFolders(rootPath);
-            assertNotNull(result);
-            assertTrue(result.contains(TEST_FOLDER));
-        }
-    }
-
-    @Test
-    public void t23_testFolderExists() {
-        System.out.println("folderExists");
-        if (_nc != null)
-        {
-            boolean result = _nc.folderExists(TEST_FOLDER);
-            assertTrue(result);
-
-            result = _nc.folderExists("non-existing-folder");
-            assertFalse(result);
-        }
-    }
-
-    @Test
-    public void t24_testDeleteFolder() {
-        System.out.println("deleteFolder");
-        if (_nc != null)
-        {
-            _nc.deleteFolder(TEST_FOLDER);
-        }
-    }
-
-    @Test
-    public void t25_testUploadFile() {
-        System.out.println("uploadFile");
-        if (_nc != null)
-        {
-            InputStream inputStream = new ByteArrayInputStream("Test".getBytes());
-            _nc.uploadFile(inputStream, TESTFILE);
-        }
-    }
-
-    @Test
-    public void t26_testFileExists() {
-        System.out.println("fileExists");
-        if (_nc != null)
-        {
-            boolean result = _nc.fileExists(TESTFILE);
-            assertTrue(result);
-
-            result = _nc.fileExists("non-existing-file");
-            assertFalse(result);
-        }
-    }
-
-    @Test
-    public void t27_testRemoveFile() {
-        System.out.println("removeFile");
-        if (_nc != null)
-        {
-            _nc.removeFile(TESTFILE);
-        }
-    }
-
-    @Test
-    public void t28_testList() {
-        System.out.println("list");
-
-        if (_nc != null)
-        {
-            //prepare
-            _nc.createFolder(TEST_FOLDER);
-
-            String rootPath = "";
-            List<String> result = _nc.listFolderContent(rootPath);
-
-            //cleanup
-            _nc.deleteFolder(TEST_FOLDER);
-
-            assertNotNull(result);
-            assertTrue(result.contains(TEST_FOLDER));
-        }
-    }
-
-    @Test
-    public void t29_testListRecursive() {
-        System.out.println("list recursive");
-        if (_nc != null)
-        {
-            //prepare
-            _nc.createFolder(TEST_FOLDER);
-            _nc.createFolder(TEST_FOLDER+"/"+TEST_FOLDER+"_sub");
-
-            String rootPath = "";
-            List<String> result = _nc.listFolderContent(rootPath, 2);
-
-            //cleanup
-            _nc.deleteFolder(TEST_FOLDER);
-
-            assertNotNull(result);
-            assertTrue(result.contains(TEST_FOLDER+"_sub"));
-        }
-    }
 }

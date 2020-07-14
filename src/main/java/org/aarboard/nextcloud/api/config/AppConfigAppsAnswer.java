@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 a.schild
+ * Copyright (C) 2020 Marco Descher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,10 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.aarboard.nextcloud.api.provisioning;
+package org.aarboard.nextcloud.api.config;
 
 import java.util.List;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -25,25 +24,21 @@ import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 import org.aarboard.nextcloud.api.utils.XMLAnswer;
 
-/**
- *
- * @author a.schild
- */
 @XmlRootElement(name = "ocs")
-public class GroupsXMLAnswer extends XMLAnswer
+public class AppConfigAppsAnswer extends XMLAnswer
 {
     private Data data;
 
-    public List<String> getGroups()
+    public List<String> getAppConfigApps()
     {
-        return data.groups;
+        return data.appConfigApps;
     }
 
     @XmlAccessorType(XmlAccessType.FIELD)
     private static final class Data
     {
-        @XmlElementWrapper(name = "groups")
+        @XmlElementWrapper(name = "data")
         @XmlElement(name = "element")
-        private List<String> groups;
+        private List<String> appConfigApps;
     }
 }

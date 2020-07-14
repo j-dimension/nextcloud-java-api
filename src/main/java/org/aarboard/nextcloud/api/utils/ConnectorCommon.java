@@ -6,8 +6,13 @@ import java.io.Reader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import javax.net.ssl.SSLContext;
 
 import org.aarboard.nextcloud.api.ServerConfig;
 import org.aarboard.nextcloud.api.exception.NextcloudApiException;
@@ -31,12 +36,15 @@ import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.ContentType;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
+import org.apache.http.ssl.SSLContexts;
 
 public class ConnectorCommon
 {
@@ -96,9 +104,14 @@ public class ConnectorCommon
 
     private URI buildUrl(String subPath, List<NameValuePair> queryParams)
     {
+    	if(serverConfig.getSubpathPrefix()!=null) {
+    		subPath = serverConfig.getSubpathPrefix()+"/"+subPath;
+    	}
+    	
         URIBuilder uB= new URIBuilder()
         .setScheme(serverConfig.isUseHTTPS() ? "https" : "http")
         .setHost(serverConfig.getServerName())
+        .setPort(serverConfig.getPort())
         .setUserInfo(serverConfig.getUserName(), serverConfig.getPassword())
         .setPath(subPath);
         if (queryParams != null)
@@ -115,6 +128,7 @@ public class ConnectorCommon
     private <R> CompletableFuture<R> executeRequest(final ResponseParser<R> parser, HttpRequestBase request)
             throws IOException, ClientProtocolException
     {
+        // https://docs.nextcloud.com/server/14/developer_manual/core/ocs-share-api.html
         request.addHeader("OCS-APIRequest", "true");
         request.addHeader("Content-Type", "application/x-www-form-urlencoded");
         request.setProtocolVersion(HttpVersion.HTTP_1_1);
@@ -122,7 +136,7 @@ public class ConnectorCommon
         HttpClientContext context = prepareContext();
 
         CompletableFuture<R> futureResponse = new CompletableFuture<>();
-        HttpAsyncClientSingleton.httpclient.execute(request, context, new ResponseCallback<R>(parser, futureResponse));
+        HttpAsyncClientSingleton.getInstance(serverConfig).execute(request, context, new ResponseCallback<>(parser, futureResponse));
         return futureResponse;
     }
 
@@ -196,20 +210,50 @@ public class ConnectorCommon
         }
     }
 
-    private static class HttpAsyncClientSingleton
-    {
-        private static final CloseableHttpAsyncClient httpclient = HttpAsyncClients.createDefault();
-
-        private HttpAsyncClientSingleton() {
-        }
-
-        static {
-            httpclient.start();
-        }
-    }
+	private static class HttpAsyncClientSingleton {
+		private static CloseableHttpAsyncClient HTTPC_CLIENT;
+		
+		private HttpAsyncClientSingleton(){}
+		
+		public static CloseableHttpAsyncClient getInstance(ServerConfig serverConfig)
+			throws IOException{
+			if (HTTPC_CLIENT == null) {
+				if (serverConfig.isTrustAllCertificates()) {
+					try {
+						SSLContext sslContext = SSLContexts.custom()
+							.loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build();
+						HTTPC_CLIENT = HttpAsyncClients.custom()
+							.setSSLHostnameVerifier((NoopHostnameVerifier.INSTANCE))
+							.setSSLContext(sslContext)
+							.build();
+					} catch (KeyManagementException | NoSuchAlgorithmException
+							| KeyStoreException e) {
+						throw new IOException(e);
+					} 
+					
+				} else {
+					HTTPC_CLIENT = HttpAsyncClients.createDefault();
+				}
+				
+				HTTPC_CLIENT.start();
+			}
+			return HTTPC_CLIENT;
+		}
+		
+	}
 
     public interface ResponseParser<R>
     {
         public R parseResponse(Reader reader);
+    }
+
+    /**
+     * Close the http client. Required for clean shutdown.
+     * @throws IOException error on shutdown
+     */
+    public static void shutdown() throws IOException{
+            if(HttpAsyncClientSingleton.HTTPC_CLIENT != null) {
+                    HttpAsyncClientSingleton.getInstance(null).close();
+            }		
     }
 }

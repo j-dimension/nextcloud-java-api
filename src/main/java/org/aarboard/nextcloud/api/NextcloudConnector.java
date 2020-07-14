@@ -16,12 +16,17 @@
  */
 package org.aarboard.nextcloud.api;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import org.aarboard.nextcloud.api.config.ConfigConnector;
 import org.aarboard.nextcloud.api.filesharing.FilesharingConnector;
 import org.aarboard.nextcloud.api.filesharing.Share;
 import org.aarboard.nextcloud.api.filesharing.SharePermissions;
@@ -35,27 +40,91 @@ import org.aarboard.nextcloud.api.provisioning.User;
 import org.aarboard.nextcloud.api.provisioning.UserData;
 import org.aarboard.nextcloud.api.provisioning.UserXMLAnswer;
 import org.aarboard.nextcloud.api.provisioning.UsersXMLAnswer;
+import org.aarboard.nextcloud.api.utils.ConnectorCommon;
 import org.aarboard.nextcloud.api.utils.ListXMLAnswer;
 import org.aarboard.nextcloud.api.utils.XMLAnswer;
 import org.aarboard.nextcloud.api.webdav.Files;
 import org.aarboard.nextcloud.api.webdav.Folders;
+import org.aarboard.nextcloud.api.webdav.ResourceProperties;
 
 public class NextcloudConnector {
 
     private final ServerConfig    _serverConfig;
     private final ProvisionConnector pc;
     private final FilesharingConnector fc;
+    private final ConfigConnector cc;
     private final Folders fd;
     private final Files fl;
 
+    /**
+     * 
+     * @param serverName    Name or IP of server of your nextcloud instance
+     * @param useHTTPS      Set true when https should be used
+     * @param port          Use 443 for https and 80 for non-https in most cases
+     * @param userName      User for login
+     * @param password      Password for login
+     */
     public NextcloudConnector(String serverName, boolean useHTTPS, int port, String userName, String password)
     {
         _serverConfig= new ServerConfig(serverName, useHTTPS, port, userName, password);
         pc= new ProvisionConnector(_serverConfig);
         fc= new FilesharingConnector(_serverConfig);
+        cc= new ConfigConnector(_serverConfig);
         fd= new Folders(_serverConfig);
         fl= new Files(_serverConfig);
     }
+    
+    /**
+     * @param serviceUrl 	url of the nextcloud instance, e.g. https://nextcloud.instance.com:8443/cloud
+     * @param userName 		User for login
+     * @param password 		Password for login
+     */
+	public NextcloudConnector(String serviceUrl, String userName, String password){
+		try {
+			URL _serviceUrl = new URL(serviceUrl);
+			boolean useHTTPS = serviceUrl.startsWith("https");
+			_serverConfig = new ServerConfig(_serviceUrl.getHost(), useHTTPS, _serviceUrl.getPort(),
+				userName, password);
+			if(!_serviceUrl.getPath().isEmpty()) {
+				_serverConfig.setSubpathPrefix(_serviceUrl.getPath());
+			}
+			pc = new ProvisionConnector(_serverConfig);
+			fc = new FilesharingConnector(_serverConfig);
+			cc= new ConfigConnector(_serverConfig);
+			fd = new Folders(_serverConfig);
+			fl = new Files(_serverConfig);
+		} catch (MalformedURLException e) {
+			throw new IllegalArgumentException(e);
+		}
+	}
+
+	/**
+	 * Close the HTTP client. Perform this to cleanly shut down this application.
+	 * @throws IOException In case of IO errors
+	 */
+	public void shutdown() throws IOException{
+		ConnectorCommon.shutdown();
+	}
+	
+	/**
+	 * Trust all HTTPS certificates presented by the server. This is e.g. used to work against a
+	 * Nextcloud instance with a self-signed certificate.
+	 * 
+	 * @param trustAllCertificates Do we accep self signed certificates or not
+	 */
+	public void trustAllCertificates(boolean trustAllCertificates){
+		_serverConfig.setTrustAllCertificates(trustAllCertificates);
+	}
+	
+	/**
+	 * Subpath prefix to the Nextcloud service (if applicable). This is the case if the Nextcloud
+	 * installation is hosted within a subdirectory.
+	 * 
+	 * @param subpathPrefix Prefix to the nextcloud installation, if not installed in root
+	 */
+	public void setSubpathPrefix(String subpathPrefix){
+		_serverConfig.setSubpathPrefix(subpathPrefix);
+	}
 
     /**
      * Creates a user
@@ -555,15 +624,51 @@ public class NextcloudConnector {
     }
 
     /**
-     * List all file names and subfolders of the specified path traversing into subfolders to the given depth.
+     * List all file names and subfolders of the specified path traversing
+     * into subfolders to the given depth.
      *
      * @param path path of the folder
      * @param depth depth of recursion while listing folder contents
+     *              (use 0 for single resource, 1 for directory listing,
+     *               -1 for infinite recursion)
      * @return found file names and subfolders
      */
     public List<String> listFolderContent(String path, int depth)
     {
         return fd.listFolderContent(path, depth);
+    }
+
+    /**
+     * List all file names and subfolders of the specified path traversing
+     * into subfolders to the given depth.
+     *
+     * @param path path of the folder
+     * @param depth depth of recursion while listing folder contents
+     *              (use 0 for single resource, 1 for directory listing,
+     *               -1 for infinite recursion)
+     * @param excludeFolderNames excludes the folder names from the result list
+     * @return found file names and subfolders
+     */
+    public List<String> listFolderContent(String path, int depth, boolean excludeFolderNames)
+    {
+        return fd.listFolderContent(path, depth, excludeFolderNames, false);
+    }
+
+    /**
+     * List all file names and subfolders of the specified path traversing
+     * into subfolders to the given depth.
+     *
+     * @param path path of the folder
+     * @param depth depth of recursion while listing folder contents
+     *              (use 0 for single resource, 1 for directory listing,
+     *               -1 for infinite recursion)
+     * @param excludeFolderNames excludes the folder names from the result list
+     * @param returnFullPath returns the full path instead of just the filename
+     * @return found file names and subfolders
+     */
+    public List<String> listFolderContent(String path, int depth, boolean excludeFolderNames, boolean returnFullPath)
+    {
+        return fd.listFolderContent(path, depth, excludeFolderNames, returnFullPath);
     }
 
     /**
@@ -601,8 +706,8 @@ public class NextcloudConnector {
      * Shares the specified path with the provided parameters
      *
      * @param path                  path to the file/folder which should be shared
-     * @param shareType             0 = user; 1 = group; 3 = public link; 6 = federated cloud share
-     * @param shareWithUserOrGroupId user / group id with which the file should be shared
+     * @param shareType             0 = user; 1 = group; 3 = public link; 4 = email; 6 = federated cloud share
+     * @param shareWithUserOrGroupId user / group id / email with which the file should be shared
      * @param publicUpload          allow public upload to a public shared folder (true/false)
      * @param password              password to protect public link Share with
      * @param permissions           1 = read; 2 = update; 4 = create; 8 = delete; 16 = share; 31 = all (default: 31, for public shares: 1)
@@ -623,8 +728,8 @@ public class NextcloudConnector {
      * Shares the specified path with the provided parameters asynchronously
      *
      * @param path                  path to the file/folder which should be shared
-     * @param shareType             0 = user; 1 = group; 3 = public link; 6 = federated cloud share
-     * @param shareWithUserOrGroupId user / group id with which the file should be shared
+     * @param shareType             0 = user; 1 = group; 3 = public link; 4 = email; 6 = federated cloud share
+     * @param shareWithUserOrGroupId user / group id / email with which the file should be shared
      * @param publicUpload          allow public upload to a public shared folder (true/false)
      * @param password              password to protect public link Share with
      * @param permissions           1 = read; 2 = update; 4 = create; 8 = delete; 16 = share; 31 = all (default: 31, for public shares: 1)
@@ -685,12 +790,45 @@ public class NextcloudConnector {
 
     /** Uploads a file at the specified path with the data from the InputStream
      *
+     * @param srcFile              The file which should be uploaded
+     * @param remotePath           path where the file should be uploaded to
+     */
+    public void uploadFile(File srcFile, String remotePath)
+    {
+        fl.uploadFile(srcFile, remotePath);
+    }
+
+    
+    /** Uploads a file at the specified path with the data from the InputStream
+     *
      * @param inputStream          InputStream of the file which should be uploaded
      * @param remotePath           path where the file should be uploaded to
+     * 
+     * @deprecated Since some nextcloud installations use fpm or fastcgi to connect to php,
+     *             here the uploads might get zero empty on the server
+     *             Use a (temp) file to upload the data, so the content length is known in advance
+     *             https://github.com/a-schild/nextcloud-java-api/issues/20
      */
     public void uploadFile(InputStream inputStream, String remotePath)
     {
         fl.uploadFile(inputStream, remotePath);
+    }
+
+    /** Uploads a file at the specified path with the data from the InputStream and continueHeader
+     *
+     * @param inputStream          InputStream of the file which should be uploaded
+     * @param remotePath           path where the file should be uploaded to
+     * @param continueHeader       to receive a possible error by the server before any data is sent
+
+     * 
+     * @deprecated Since some nextcloud installations use fpm or fastcgi to connect to php,
+     *             here the uploads might get zero empty on the server
+     *             Use a (temp) file to upload the data, so the content length is known in advance
+     *             https://github.com/a-schild/nextcloud-java-api/issues/20
+     */
+    public void uploadFile(InputStream inputStream, String remotePath, boolean continueHeader)
+    {
+        fl.uploadFile(inputStream, remotePath, continueHeader);
     }
 
     /**
@@ -711,6 +849,19 @@ public class NextcloudConnector {
         return fl.fileExists(path);
     }
 
+    
+    /**
+     * Retrieve the file properties from the server
+     * 
+     * @param path to the file you are interested in it
+     * @return properties of this resource
+     * 
+     * @throws IOException 404 in case of resource not found on server
+     */
+    public ResourceProperties getFileProperties(String path) throws IOException {
+        return fl.getFileProperties(path);
+    }
+            
     /**
      * Gets all shares from a given file/folder
      *
@@ -808,4 +959,115 @@ public class NextcloudConnector {
     {
         return fc.editShareAsync(shareId, values);
     }
+
+    /**
+     * Download the file from the remotepath to the download path specified in the
+     *
+     * @param remotepath Remotepath of the file to be downloaded from the nextcloud server
+     * @param downloadpath Local path where the file has to be downloaded in the local machine
+     * @return boolean true if sucessfull
+     * @throws java.io.IOException In case of IO errors
+     */
+    public boolean downloadFile(String remotepath, String downloadpath) throws IOException
+    {
+        return fl.downloadFile(remotepath, downloadpath);
+    }
+
+    /**
+     * Download the file from the remotepath to an InputStream
+     *
+     * @param remotepath Remotepath of the file to be downloaded from the nextcloud server
+     * @return InputStream (Don't forget to close the InputStream once you are done with it)
+     * @throws java.io.IOException In case of IO errors
+     */
+    public InputStream downloadFile(String remotepath) throws IOException
+    {
+        return fl.downloadFile(remotepath);
+    }
+
+    /**
+     *
+     * @param remotepath Remotepath of the folder to be downloaded from the nextcloud server
+     * @param downloadpath Local path where the folder has to be downloaded in the local machine
+     * @throws IOException  In case of IO errors
+     */
+    public void downloadFolder(String remotepath, String downloadpath) throws IOException
+    {
+         fd.downloadFolder(remotepath, downloadpath);
+    }
+    
+    /**
+     * App-Configuration: Get all apps available for configuration
+     * @return list of all available apps
+     */
+	public List<String> getAppConfigApps()
+	{
+		return cc.getAppConfigApps();
+	}
+	
+	/**
+	 * App-Configuration: Get all keys available for an app
+	 * @param appConfigApp an app name as returned by {@link #getAppConfigApps()}
+	 * @return All keys of this app
+	 */
+	public List<String> getAppConfigAppKeys(String appConfigApp)
+	{
+		return cc.getAppConfigAppKeys(appConfigApp);
+	}
+
+	/**
+	 * App-Configuration: Get a key value for an app configuration
+	 * @param appConfigApp an app name as returned by {@link #getAppConfigApps()}
+	 * @param appConfigAppKey a key name as returned by {@link #getAppConfigAppKeys(String)}
+	 * @return app config entry
+	 */
+	public String getAppConfigAppKeyValue(String appConfigApp, String appConfigAppKey)
+	{
+		return cc.getAppConfigAppKeyValue(appConfigApp, appConfigAppKey);
+	}
+	
+	/**
+	 * App-Configuration: Get a key value for an app configuration
+         * @param appConfigAppKeyPath config path to return
+	 * @return app config entry
+	 */
+	public String getAppConfigAppKeyValue(String appConfigAppKeyPath)
+	{
+		return cc.getAppConfigAppKeyValue(appConfigAppKeyPath);
+	}
+	
+	/**
+	 * App-Configuration: Edit a key value for an app configuration
+	 * @param appConfigApp an app name as returned by {@link #getAppConfigApps()}
+	 * @param appConfigAppKey a key name as returned by {@link #getAppConfigAppKeys(String)}
+	 * @param value the value to set
+	 * @return true if sucessfully set
+	 */
+	public boolean setAppConfigAppKeyValue(String appConfigApp, String appConfigAppKey, Object value) 
+	{
+		return cc.setAppConfigAppKeyValue(appConfigApp, appConfigAppKey, value);
+	}
+	
+	/**
+	 * 
+	 * @param appConfigAppKeyPath
+	 *            the full appConfigAppKeyPath combining appConfigApp and appConfigAppKey with "/"
+	 * @param value
+	 *            the value to set
+	 * @return Operation sucessfull
+	 */
+	public boolean setAppConfigAppKeyValue(String appConfigAppKeyPath, Object value){
+		return cc.setAppConfigAppKeyValue(appConfigAppKeyPath, value);
+	}
+	
+	/**
+	 * App-Configuration: Delete a key of an app configuration
+	 * @param appConfigApp an app name as returned by {@link #getAppConfigApps()}
+	 * @param appConfigAppkey a key name as returned by {@link #getAppConfigAppKeys(String)}
+	 * @return Operation sucessfull
+	 */
+	public boolean deleteAppConfigAppKeyEntry(String appConfigApp, String appConfigAppkey)
+	{
+		return cc.deleteAppConfigAppKeyEntry(appConfigApp, appConfigAppkey);
+	}
 }

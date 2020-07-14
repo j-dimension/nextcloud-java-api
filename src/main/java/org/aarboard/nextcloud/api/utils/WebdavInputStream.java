@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 a.schild
+ * Copyright (C) 2019 andre
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,23 +14,33 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.aarboard.nextcloud.api.filesharing;
+package org.aarboard.nextcloud.api.utils;
 
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
-import org.aarboard.nextcloud.api.utils.XMLAnswer;
+import com.github.sardine.Sardine;
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.commons.io.input.ProxyInputStream;
 
 /**
  *
- * @author a.schild
+ * @author andre
  */
-@XmlRootElement(name = "ocs")
-public class SingleShareXMLAnswer extends XMLAnswer
-{
-	@XmlElement(name = "data")
-    private Share share= null;
+public class WebdavInputStream extends ProxyInputStream {
 
-    public Share getShare() {
-        return share;
+    private final Sardine sardine; // Sardine instance used
+    
+    public WebdavInputStream(Sardine sardine, InputStream in)
+    {
+        super(in);
+        this.sardine= sardine;
     }
+
+    @Override
+    public void close() throws IOException {
+        super.close();
+        sardine.shutdown();
+    }
+    
+    
+    
 }
